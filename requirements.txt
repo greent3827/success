@@ -1,0 +1,5 @@
+faster-whisper
+opencv-python
+numpy
+pillow
+easyocr

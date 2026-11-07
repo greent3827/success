@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>영상 자동화 스튜디오</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --panel2:#f0f2f5; --line:#e2e5ea; --text:#1b1f24; --muted:#667085;
+  --accent:#e5484d; --accent-ink:#fff; --accent-soft:#fdecec; --ok:#1a7f4b; --ok-soft:#e5f5ec;
+  --warn:#9a6700; --warn-soft:#fff6db; --run:#2563eb; --run-soft:#e8efff; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#121417; --panel:#1a1d21; --panel2:#22262b; --line:#2e333a; --text:#e8eaed; --muted:#9aa3ae;
+  --accent:#ff6369; --accent-ink:#1a0b0b; --accent-soft:#3a1d1f; --ok:#4cc38a; --ok-soft:#173226;
+  --warn:#f0c14b; --warn-soft:#3a3016; --run:#7aa2ff; --run-soft:#1b2540; --shadow:none}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{font-size:17px;margin:0;font-weight:700;display:flex;align-items:center;gap:8px}
+header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.chip{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--panel2);color:var(--muted);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.bad{background:var(--warn-soft);color:var(--warn)}
+.btn{border:1px solid var(--line);background:var(--panel);padding:7px 13px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--panel2)} .btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.sm{padding:4px 9px;font-size:12.5px;border-radius:6px}
+.btn.ghost{border-color:transparent;background:transparent}
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:16px;padding:16px 20px;align-items:start}
+@media (max-width:1200px){main{grid-template-columns:280px minmax(0,1fr)} #jobsCol{grid-column:1 / -1}}
+@media (max-width:760px){main{grid-template-columns:1fr;padding:12px 16px} header{flex-wrap:wrap;padding:12px 16px} .banner{margin:12px 16px 0}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.panel h2{font-size:14px;margin:0;padding:12px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.panel h2 .right{margin-left:auto}
+.pad{padding:14px}
+.banner{margin:16px 20px 0;padding:12px 14px;border-radius:10px;background:var(--warn-soft);color:var(--warn);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.banner b{color:inherit}
+#drop{margin:12px;border:1.5px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
+#drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+#drop .big{font-weight:600;color:var(--text)}
+.prog{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:8px;display:none}
+.prog i{display:block;height:100%;background:var(--accent);width:0}
+#videoList{list-style:none;margin:0;padding:0 6px 8px;max-height:calc(100vh - 290px);overflow:auto}
+#videoList li{padding:10px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
+#videoList li:hover{background:var(--panel2)}
+#videoList li.sel{background:var(--accent-soft)}
+.vname{font-weight:600;word-break:break-all}
+.meta{font-size:12px;color:var(--muted)}
+.badges{display:flex;gap:4px;flex-wrap:wrap}
+.badge{font-size:11px;padding:1px 7px;border-radius:999px;background:var(--panel2);color:var(--muted)}
+.badge.ok{background:var(--ok-soft);color:var(--ok)} .badge.run{background:var(--run-soft);color:var(--run)}
+.empty{color:var(--muted);text-align:center;padding:40px 16px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.srcplayer{width:100%;max-height:360px;background:#000;border-radius:8px;display:block}
+.toprow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px}
+@media (max-width:980px){.toprow{grid-template-columns:1fr}}
+details.opts{border:1px solid var(--line);border-radius:8px;margin-top:10px}
+details.opts summary{cursor:pointer;padding:8px 12px;font-weight:600;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;padding:4px 12px 12px}
+.grid label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted)}
+.grid label.chk{flex-direction:row;align-items:center;gap:6px;color:var(--text)}
+input[type=text],input[type=number],input[type=password],select,textarea{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:56px}
+.hint{font-size:12px;color:var(--muted)}
+.section{margin-top:16px}
+.section h3{font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.result{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--panel)}
+.shorts{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
+a.btn{text-decoration:none;display:inline-block;color:inherit}
+.short{display:grid;grid-template-columns:140px minmax(0,1fr);gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--panel)}
+@media (max-width:480px){.short{grid-template-columns:1fr}.shorts{grid-template-columns:1fr}.vert{max-width:220px;margin:0 auto}}
+.vert{width:100%;aspect-ratio:9/16;background:#000;border-radius:8px;object-fit:contain}
+.vert.none{display:flex;align-items:center;justify-content:center;color:#aaa;font-size:12px;text-align:center;padding:8px}
+.short .f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.short label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.copyrow{display:flex;gap:4px;align-items:center}
+.copyrow input,.copyrow textarea{flex:1}
+.reason{font-size:12px;color:var(--muted)}
+#jobsCol{position:sticky;top:70px}
+#jobList{list-style:none;margin:0;padding:6px;max-height:260px;overflow:auto}
+#jobList li{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+#jobList li:hover{background:var(--panel2)} #jobList li.sel{background:var(--panel2)}
+.jt{display:flex;gap:6px;align-items:center;font-weight:600;font-size:13px}
+.jt span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.st{font-size:11px;padding:1px 7px;border-radius:999px;white-space:nowrap}
+.st.queued{background:var(--panel2);color:var(--muted)} .st.running{background:var(--run-soft);color:var(--run)}
+.st.done{background:var(--ok-soft);color:var(--ok)} .st.failed,.st.canceled{background:var(--warn-soft);color:var(--warn)}
+.jl{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+#log{margin:0;padding:10px 12px;height:340px;overflow:auto;background:#0f1115;color:#d6dae0;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;border-radius:0 0 12px 12px}
+#log .err{color:#ff8a8a} #log .ok{color:#6ee7a8} #log .step{color:#93c5fd;font-weight:700}
+dialog{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--panel);color:var(--text);width:min(520px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog .pad{display:flex;flex-direction:column;gap:12px}
+pre.md{white-space:pre-wrap;font:13px/1.6 var(--mono);margin:0;max-height:65vh;overflow:auto;padding:14px}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:20}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span>영상 자동화 스튜디오</h1>
+  <div class="chips" id="chips"></div>
+  <button class="btn sm" id="btnSettings">API 키 설정</button>
+</header>
+<div id="offline"></div>
+<div id="banner"></div>
+
+<main>
+  <!-- 왼쪽: 영상 목록 -->
+  <section class="panel">
+    <h2>내 영상 <button class="btn sm ghost right" id="btnRefresh" title="새로 고침">↻</button></h2>
+    <div id="drop">
+      <div class="big">영상을 여기에 끌어다 놓기</div>
+      <div class="meta">또는 눌러서 고르기 · 업로드 폴더에 저장됩니다</div>
+      <div class="prog" id="upProg"><i></i></div>
+      <div class="meta" id="upText"></div>
+    </div>
+    <input type="file" id="fileInput" accept="video/*" multiple hidden>
+    <ul id="videoList"></ul>
+  </section>
+
+  <!-- 가운데: 선택한 영상 -->
+  <section class="panel" id="detail">
+    <div class="empty">왼쪽에서 영상을 고르거나 새 영상을 올려 주세요.</div>
+  </section>
+
+  <!-- 오른쪽: 작업 -->
+  <section class="panel" id="jobsCol">
+    <h2>작업 <button class="btn sm ghost right" id="btnClear">끝난 작업 지우기</button></h2>
+    <ul id="jobList"></ul>
+    <h2 style="border-top:1px solid var(--line)"><span id="logTitle">진행 기록</span>
+      <button class="btn sm right" id="btnCancel" hidden>취소</button></h2>
+    <pre id="log">작업을 시작하면 여기에 진행 상황이 나옵니다.</pre>
+  </section>
+</main>
+
+<dialog id="dlgKeys">
+  <form class="pad" id="keyForm">
+    <h3 style="margin:0">API 키 설정</h3>
+    <div class="hint">키는 이 컴퓨터 사용자 폴더(OneDrive 밖)에만 저장됩니다. 비워 두면 기존 값을 유지하고, 시스템에 등록한 키(setx)가 있으면 그것도 씁니다.</div>
+    <label>Claude (ANTHROPIC_API_KEY) — 구간 고르기, 필러·개인정보 판단<input type="password" name="ANTHROPIC_API_KEY" autocomplete="off"></label>
+    <label>OpenAI (OPENAI_API_KEY) — 설명 그림<input type="password" name="OPENAI_API_KEY" autocomplete="off"></label>
+    <div class="hint" id="keyNow"></div>
+    <div class="hint" id="keyTest"></div>
+    <div class="actions" style="justify-content:flex-end">
+      <button class="btn" type="button" id="btnTestKeys">연결 테스트</button>
+      <button class="btn" type="button" onclick="dlgKeys.close()">닫기</button>
+      <button class="btn primary" type="submit" id="btnSaveKeys">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgText">
+  <div style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)">
+    <b id="textTitle"></b><button class="btn sm right" style="margin-left:auto" onclick="dlgText.close()">닫기</button>
+  </div>
+  <pre class="md" id="textBody"></pre>
+</dialog>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fileUrl = (p, m) => "/file?path=" + encodeURIComponent(p) + (m ? "&v=" + Math.round(m) : "");
+const fmtSize = b => b > 1e9 ? (b/1e9).toFixed(1)+"GB" : (b/1e6).toFixed(1)+"MB";
+const fmtT = s => { s = Math.max(0, +s || 0); const m = Math.floor(s/60); return m + ":" + (s - m*60).toFixed(1).padStart(4, "0"); };
+const STATUS = {queued:"대기 중", running:"진행 중", done:"완료", failed:"실패", canceled:"취소됨"};
+
+let state = {videos: [], jobs: [], keys: {}, deps: {}};
+let selected = null, selJob = null, logNext = 0, detailSig = "";
+
+function toast(msg){ const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("on"), 2200); }
+function store(k, v){ try{ v === undefined ? (v = JSON.parse(localStorage.getItem(k))) : localStorage.setItem(k, JSON.stringify(v)); }catch(e){ return null; } return v; }
+
+const FILE_MODE = location.protocol === "file:";
+const OFFLINE_MSG = FILE_MODE
+  ? "webapp.html 파일을 직접 열면 동작하지 않아요. 이 창을 닫고 success 폴더의 '웹앱실행.bat'을 더블클릭해서 여세요."
+  : "웹앱 프로그램(검은 창)이 꺼져 있어요. '웹앱실행.bat'을 다시 실행한 뒤 이 페이지를 새로 고침하세요.";
+let offline = false;
+
+async function api(path, body){
+  let r;
+  try{
+    r = await fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  } catch(e){
+    setOffline(true);
+    throw new Error(OFFLINE_MSG);       // "Failed to fetch" 대신 알기 쉬운 안내
+  }
+  setOffline(false);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ("오류 " + r.status));
+  return j;
+}
+function setOffline(v){
+  if (offline === v) return;
+  offline = v;
+  $("#offline").innerHTML = v ? `<div class="banner" style="background:var(--accent-soft);color:var(--accent)"><b>연결 안 됨</b> ${esc(OFFLINE_MSG)}</div>` : "";
+}
+
+// ───────── 상태 불러오기
+async function refresh(){
+  try { state = await api("/api/state"); } catch(e){ return; }
+  renderChips(); renderBanner(); renderVideos(); renderJobs(); renderDetail();
+}
+function renderChips(){
+  const k = state.keys, d = state.deps;
+  const img = k.OPENAI_API_KEY?.set;
+  $("#chips").innerHTML =
+    `<span class="chip ${d.ffmpeg ? "ok" : "bad"}">ffmpeg ${d.ffmpeg ? "준비됨" : "없음"}</span>` +
+    `<span class="chip ${k.ANTHROPIC_API_KEY?.set && !k.ANTHROPIC_API_KEY.warn ? "ok" : "bad"}">Claude 키 ${!k.ANTHROPIC_API_KEY?.set ? "없음" : k.ANTHROPIC_API_KEY.warn ? "확인 필요" : "있음"}</span>` +
+    `<span class="chip ${img ? "ok" : ""}">OpenAI 키 ${img ? "있음" : "없음"}</span>`;
+}
+function renderBanner(){
+  const d = state.deps, msgs = [];
+  if (!d.ffmpeg) msgs.push(`<b>ffmpeg가 없습니다.</b> 명령 프롬프트에서 <code>winget install ffmpeg</code> 실행 후 웹앱을 다시 켜 주세요.`);
+  if (d.missing?.length) msgs.push(`<b>필요한 프로그램이 빠져 있습니다:</b> ${esc(d.missing.join(", "))} <button class="btn sm" onclick="runInstall()">지금 설치</button>`);
+  if (!d.editor || !d.shorts) msgs.push(`<b>auto_editor.py / auto_shorts.py</b>가 app.py와 같은 폴더에 있어야 합니다.`);
+  $("#banner").innerHTML = msgs.length ? `<div class="banner">${msgs.join("<br>")}</div>` : "";
+}
+function runningFor(path){ return state.jobs.find(j => j.video === path && (j.status === "running" || j.status === "queued")); }
+
+function renderVideos(){
+  const ul = $("#videoList");
+  if (!state.videos.length){ ul.innerHTML = `<li class="empty" style="cursor:default">아직 영상이 없어요</li>`; return; }
+  ul.innerHTML = state.videos.map(v => {
+    const n = v.shorts.reduce((a, s) => a + s.items.filter(i => i.file).length, 0);
+    const run = runningFor(v.path);
+    return `<li data-p="${esc(v.path)}" class="${v.path === selected ? "sel" : ""}">
+      <span class="vname">${esc(v.name)}</span>
+      <span class="meta">${v.folder ? esc(v.folder) + " · " : ""}${fmtSize(v.size)}</span>
+      <span class="badges">${run ? `<span class="badge run">${STATUS[run.status]}</span>` : ""}
+        ${v.edited ? `<span class="badge ok">편집본</span>` : ""}${n ? `<span class="badge ok">쇼츠 ${n}개</span>` : ""}</span></li>`;
+  }).join("");
+  ul.querySelectorAll("li[data-p]").forEach(li => li.onclick = () => { selected = li.dataset.p; store("sel", selected); detailSig = ""; renderVideos(); renderDetail(); });
+}
+
+// ───────── 선택한 영상
+const EDIT_DEF = {"blur-faces":false, "no-illustrations":false, "illustration-mode":"full", "max-pause":0.45, "replan":false};
+const SHORTS_DEF = {"count":3, "min-len":20, "max-len":58, "layout":"auto", "zoom":1.0, "no-title":false, "no-captions":false, "no-trim":false, "replan":false};
+let editOpts = {...EDIT_DEF, ...(store("editOpts") || {})}, shortsOpts = {...SHORTS_DEF, ...(store("shortsOpts") || {})};
+
+function optInput(group, key, o){
+  const val = (group === "edit" ? editOpts : shortsOpts)[key];
+  if (o.type === "chk") return `<label class="chk"><input type="checkbox" data-g="${group}" data-k="${key}" ${val ? "checked" : ""}>${o.label}</label>`;
+  if (o.type === "sel") return `<label>${o.label}<select data-g="${group}" data-k="${key}">${o.opts.map(([v, t]) => `<option value="${v}" ${v == val ? "selected" : ""}>${t}</option>`).join("")}</select></label>`;
+  return `<label>${o.label}<input type="number" data-g="${group}" data-k="${key}" value="${val}" step="${o.step || 1}" min="${o.min}" max="${o.max}"></label>`;
+}
+function optionsHtml(){
+  const E = {
+    "max-pause": {label:"이보다 긴 쉼 자르기(초)", step:0.05, min:0.2, max:3},
+    "illustration-mode": {type:"sel", label:"설명 그림 방식", opts:[["full","화면 전체"],["overlay","오른쪽 위 카드"]]},
+    "blur-faces": {type:"chk", label:"얼굴 모자이크"},
+    "no-illustrations": {type:"chk", label:"설명 그림 넣지 않기"},
+    "replan": {type:"chk", label:"편집 계획 새로 짜기"}};
+  const S = {
+    "count": {label:"만들 개수", min:1, max:20},
+    "layout": {type:"sel", label:"화면 방식", opts:[["auto","자동"],["blur","흐린 배경 + 원본"],["crop","얼굴 따라 자르기"]]},
+    "min-len": {label:"최소 길이(초)", min:5, max:170},
+    "max-len": {label:"최대 길이(초)", min:10, max:180},
+    "zoom": {label:"흐린 배경일 때 원본 크기", step:0.1, min:1, max:1.6},
+    "no-title": {type:"chk", label:"상단 제목 빼기"},
+    "no-captions": {type:"chk", label:"자막 빼기"},
+    "no-trim": {type:"chk", label:"쉼 자르지 않기"},
+    "replan": {type:"chk", label:"구간 새로 고르기"}};
+  return `<details class="opts"><summary>영상 편집 옵션</summary><div class="grid">${Object.entries(E).map(([k, o]) => optInput("edit", k, o)).join("")}</div></details>
+          <details class="opts"><summary>쇼츠 옵션</summary><div class="grid">${Object.entries(S).map(([k, o]) => optInput("shorts", k, o)).join("")}</div></details>`;
+}
+
+function renderDetail(){
+  const box = $("#detail"), v = state.videos.find(x => x.path === selected);
+  if (!v){ if (detailSig !== "none"){ detailSig = "none"; box.innerHTML = `<div class="empty">왼쪽에서 영상을 고르거나 새 영상을 올려 주세요.</div>`; } return; }
+  const run = runningFor(v.path);
+  const sig = JSON.stringify([v, run?.id, run?.status]);
+  if (sig === detailSig) return;
+  // 사용자가 입력 중이면 다시 그리지 않음
+  if (box.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && detailSig.startsWith('[{"path":' + JSON.stringify(v.path))) return;
+  const keepScroll = window.scrollY;
+  detailSig = sig;
+  const fromEd = store("fromEdited") !== false;
+  box.innerHTML = `
+  <h2>${esc(v.name)}<button class="btn sm right" onclick="openPath('${esc(v.path)}')">폴더 열기</button></h2>
+  <div class="pad">
+    <div class="toprow">
+      <video class="srcplayer" src="${fileUrl(v.path, v.mtime)}" controls preload="metadata"></video>
+      <div>
+        <div class="actions">
+          <button class="btn primary" onclick="startJob('edit')" ${run ? "disabled" : ""}>✂ 영상 편집</button>
+          <button class="btn primary" onclick="startJob('shorts')" ${run ? "disabled" : ""}>▮ 쇼츠 만들기</button>
+          <button class="btn" onclick="startJob('both')" ${run ? "disabled" : ""}>편집 후 쇼츠까지</button>
+        </div>
+        <div class="hint" style="margin-top:6px">${run ? `<b>${STATUS[run.status]}</b> — 오른쪽 작업 창에서 진행 상황을 볼 수 있어요.` : "편집: 무음·필러 컷, 설명 그림, 개인정보 가리기 · 쇼츠: 핵심 구간을 세로 영상으로"}</div>
+        ${v.edited ? `<label class="chk hint" style="display:flex;gap:6px;align-items:center;margin-top:8px"><input type="checkbox" id="fromEdited" ${fromEd ? "checked" : ""}> 쇼츠는 편집본으로 만들기 (추천)</label>` : ""}
+        ${optionsHtml()}
+      </div>
+    </div>
+    ${v.edited ? `<div class="section"><h3>편집본
+        <a class="btn sm" href="${fileUrl(v.edited.file)}&download=1">내려받기</a>
+        ${v.edited.report ? `<button class="btn sm" onclick="showText('${esc(v.edited.report)}','편집 보고서')">편집 보고서</button>` : ""}
+        <button class="btn sm" onclick="openPath('${esc(v.edited.file)}')">폴더에서 보기</button></h3>
+        <video class="srcplayer" src="${fileUrl(v.edited.file, v.edited.mtime)}" controls preload="metadata"></video></div>` : ""}
+    ${v.shorts.map(shortsHtml).join("")}
+  </div>`;
+  box.querySelectorAll("[data-g]").forEach(el => el.onchange = () => {
+    const o = el.dataset.g === "edit" ? editOpts : shortsOpts;
+    o[el.dataset.k] = el.type === "checkbox" ? el.checked : (el.type === "number" ? +el.value : el.value);
+    store(el.dataset.g === "edit" ? "editOpts" : "shortsOpts", o);
+  });
+  const fe = $("#fromEdited"); if (fe) fe.onchange = () => store("fromEdited", fe.checked);
+  window.scrollTo(0, keepScroll);
+}
+
+function shortsHtml(g){
+  const fromEdited = /_edited\.mp4$/.test(g.source);
+  return `<div class="section"><h3>쇼츠 <span class="badge">${fromEdited ? "편집본에서" : "원본에서"} · ${g.planner === "claude" ? "Claude가 고름" : "규칙 기반"}</span>
+    ${g.report ? `<button class="btn sm" onclick="showText('${esc(g.report)}','업로드 정리')">업로드 정리 보기</button>` : ""}
+    <button class="btn sm" onclick="openPath('${esc(g.dir)}')">폴더 열기</button></h3>
+    <div class="shorts">${g.items.map(s => shortCard(g, s)).join("") || `<div class="hint">아직 만든 쇼츠가 없어요.</div>`}</div></div>`;
+}
+function shortCard(g, s){
+  const id = `${g.dir}#${s.id}`;
+  return `<div class="short" data-id="${esc(id)}">
+    ${s.file ? `<video class="vert" src="${fileUrl(s.file, s.mtime)}" controls preload="metadata"></video>` : `<div class="vert none">아직 렌더링 안 됨</div>`}
+    <div class="f">
+      <div class="jt"><span class="t">${s.id}. ${esc(s.title)}</span><span class="badge">${fmtT(s.end - s.start)}</span></div>
+      <label>화면 제목<input type="text" data-f="title" value="${esc(s.title)}"></label>
+      <div class="row2"><label>시작(초) <input type="number" step="0.1" data-f="start" value="${s.start}"></label>
+        <label>끝(초)<input type="number" step="0.1" data-f="end" value="${s.end}"></label></div>
+      <label>업로드 제목<span class="copyrow"><input type="text" data-f="upload_title" value="${esc(s.upload_title)}"><button class="btn sm" onclick="copyField(this,'upload_title',' #shorts')">복사</button></span></label>
+      <label>설명<span class="copyrow"><textarea data-f="description" rows="2">${esc(s.description)}</textarea><button class="btn sm" onclick="copyDesc(this)">복사</button></span></label>
+      <label>해시태그<span class="copyrow"><input type="text" data-f="hashtags" value="${esc((s.hashtags || []).join(" "))}"><button class="btn sm" onclick="copyField(this,'hashtags')">복사</button></span></label>
+      ${s.reason ? `<div class="reason">고른 이유: ${esc(s.reason)}${s.score !== undefined ? ` · 점수 ${esc(s.score)}` : ""}</div>` : ""}
+      <div class="actions">
+        <button class="btn sm" onclick="savePlan(this,'${esc(g.plan)}',${s.id},false)">저장</button>
+        <button class="btn sm primary" onclick="savePlan(this,'${esc(g.plan)}',${s.id},true,'${esc(g.source)}')">저장 후 다시 만들기</button>
+        ${s.file ? `<a class="btn sm" href="${fileUrl(s.file)}&download=1">내려받기</a>` : ""}
+      </div>
+    </div></div>`;
+}
+function cardVals(btn){
+  const c = btn.closest(".short"), o = {};
+  c.querySelectorAll("[data-f]").forEach(el => o[el.dataset.f] = el.value);
+  return o;
+}
+async function copyText(t){ try{ await navigator.clipboard.writeText(t); toast("복사했어요"); } catch(e){ toast("복사하지 못했어요"); } }
+function copyField(btn, f, suffix = ""){ copyText(cardVals(btn)[f] + suffix); }
+function copyDesc(btn){ const v = cardVals(btn); copyText(v.description + "\n\n" + v.hashtags); }
+
+async function savePlan(btn, plan, id, rerender, source){
+  const v = cardVals(btn);
+  try{
+    await api("/api/plan", {plan, item: {id, ...v, start: +v.start, end: +v.end}});
+    detailSig = "";
+    if (rerender){
+      const video = state.videos.find(x => x.path === selected);
+      await api("/api/jobs", {action:"shorts", video: video.path, from_edited: /_edited\.mp4$/.test(source), only:[id], shorts: {...shortsOpts, replan:false}});
+      toast(`${id}번 쇼츠를 다시 만들고 있어요`);
+    } else toast("저장했어요");
+    refresh();
+  } catch(e){ toast(e.message); }
+}
+
+async function startJob(action){
+  const v = state.videos.find(x => x.path === selected); if (!v) return;
+  const fe = $("#fromEdited");
+  try{
+    const j = await api("/api/jobs", {action, video: v.path, edit: editOpts, shorts: shortsOpts, from_edited: fe ? fe.checked : false});
+    selectJob(j.id); toast("작업을 시작했어요"); refresh();
+  } catch(e){ toast(e.message); }
+}
+async function runInstall(){ try{ const j = await api("/api/jobs", {action:"install"}); selectJob(j.id); refresh(); } catch(e){ toast(e.message); } }
+async function openPath(p){ try{ await api("/api/open", {path: p}); } catch(e){ toast(e.message); } }
+async function showText(p, title){
+  try{ const r = await api("/api/text?path=" + encodeURIComponent(p)); $("#textTitle").textContent = title; $("#textBody").textContent = r.text; $("#dlgText").showModal(); }
+  catch(e){ toast(e.message); }
+}
+
+// ───────── 작업
+function renderJobs(){
+  const ul = $("#jobList");
+  if (!state.jobs.length){ ul.innerHTML = `<li class="empty" style="cursor:default;padding:20px">아직 작업이 없어요</li>`; }
+  else ul.innerHTML = state.jobs.map(j => `<li data-id="${j.id}" class="${j.id === selJob ? "sel" : ""}">
+      <span class="jt"><span class="t">${esc(j.title)}</span><span class="st ${j.status}">${STATUS[j.status]}</span></span>
+      <span class="jl">${esc(j.last)}</span></li>`).join("");
+  ul.querySelectorAll("li[data-id]").forEach(li => li.onclick = () => selectJob(+li.dataset.id));
+  if (!selJob){ const r = state.jobs.find(j => j.status === "running") || state.jobs[0]; if (r) selectJob(r.id); }
+  const cur = state.jobs.find(j => j.id === selJob);
+  $("#btnCancel").hidden = !cur || !(cur.status === "running" || cur.status === "queued");
+}
+function selectJob(id){
+  if (selJob !== id){ selJob = id; logNext = 0; $("#log").innerHTML = ""; }
+  document.querySelectorAll("#jobList li").forEach(li => li.classList.toggle("sel", +li.dataset.id === id));
+  pollLog();
+}
+function lineHtml(l){
+  const cls = /^\[(오류|실패|경고)|Traceback|Error/.test(l) ? "err" : /^✔|완료/.test(l) ? "ok" : /^━━━|^▶|^\$ /.test(l) ? "step" : "";
+  return cls ? `<span class="${cls}">${esc(l)}</span>` : esc(l);
+}
+let logBusy = false;
+async function pollLog(){
+  if (!selJob || logBusy) return; logBusy = true;
+  try{
+    const r = await api(`/api/jobs/${selJob}?since=${logNext}`);
+    const el = $("#log"), atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    if (r.log.length){ el.insertAdjacentHTML("beforeend", r.log.map(lineHtml).join("\n") + "\n"); logNext = r.next; }
+    $("#logTitle").textContent = r.title;
+    if (atBottom) el.scrollTop = el.scrollHeight;
+  } catch(e){ if (/없습니다/.test(e.message)) selJob = null; }
+  logBusy = false;
+}
+$("#btnCancel").onclick = async () => { if (selJob && confirm("이 작업을 취소할까요?")){ await api(`/api/jobs/${selJob}/cancel`, {}); refresh(); } };
+$("#btnClear").onclick = async () => { await api("/api/jobs/clear", {}); selJob = null; $("#log").textContent = ""; refresh(); };
+$("#btnRefresh").onclick = () => { detailSig = ""; refresh(); };
+
+// ───────── 업로드
+const drop = $("#drop"), fileInput = $("#fileInput");
+drop.onclick = () => fileInput.click();
+fileInput.onchange = () => uploadFiles([...fileInput.files]);
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => uploadFiles([...e.dataTransfer.files]));
+function uploadOne(f){
+  return new Promise((ok, bad) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", "/api/upload");
+    x.setRequestHeader("X-Filename", encodeURIComponent(f.name));
+    x.upload.onprogress = e => { if (e.lengthComputable) $("#upProg i").style.width = (e.loaded / e.total * 100) + "%"; };
+    x.onload = () => { let j = {}; try{ j = JSON.parse(x.responseText); }catch(e){} x.status < 300 ? ok(j) : bad(new Error(j.error || "업로드 실패")); };
+    x.onerror = () => bad(new Error("업로드 실패"));
+    x.send(f);
+  });
+}
+async function uploadFiles(files){
+  if (!files.length) return;
+  $("#upProg").style.display = "block";
+  for (const [i, f] of files.entries()){
+    $("#upText").textContent = `${f.name} 올리는 중… (${i + 1}/${files.length})`;
+    $("#upProg i").style.width = "0";
+    try{ const r = await uploadOne(f); selected = r.path; store("sel", selected); detailSig = ""; }
+    catch(e){ toast(`${f.name}: ${e.message}`); }
+  }
+  $("#upProg").style.display = "none"; $("#upText").textContent = ""; fileInput.value = "";
+  refresh();
+}
+
+// ───────── API 키
+$("#btnSettings").onclick = () => {
+  const k = state.keys;
+  showKeyNow(k);
+  $("#keyTest").innerHTML = "";
+  $("#keyForm").reset(); $("#dlgKeys").showModal();
+};
+function showKeyNow(k){
+  $("#keyNow").innerHTML = Object.entries(k).filter(([n]) => n !== "GEMINI_API_KEY").map(([n, v]) =>
+    `${n}: ${v.set ? `등록됨 (${esc(v.source)}${v.hint ? " · " + esc(v.hint) : ""})` : "없음"}` +
+    (v.warn ? ` <b style="color:var(--warn)">⚠ ${esc(v.warn)}</b>` : "")).join("<br>");
+}
+// 입력한 키 저장 (Enter / 저장 버튼 / 연결 테스트 모두 이걸 거침)
+async function saveTypedKeys(){
+  const keys = {}; new FormData($("#keyForm")).forEach((v, k) => { v = String(v).trim(); if (v) keys[k] = v; });
+  if (!Object.keys(keys).length) return null;          // 새로 입력한 키가 없음
+  const r = await api("/api/settings", {keys});
+  // 서버가 실제로 저장했는지 확인
+  const missing = Object.keys(keys).filter(k => !r.keys[k]?.set);
+  if (missing.length) throw new Error("저장이 되지 않았어요: " + missing.join(", "));
+  showKeyNow(r.keys); $("#keyForm").reset(); refresh();
+  return r;
+}
+$("#keyForm").onsubmit = async e => {
+  e.preventDefault();
+  $("#keyTest").textContent = "저장하는 중…";
+  try{
+    const r = await saveTypedKeys();
+    if (!r){ $("#keyTest").textContent = "입력한 키가 없어요. 칸에 키를 붙여 넣은 뒤 저장을 눌러 주세요."; return; }
+    const warn = Object.values(r.keys).some(v => v.warn);
+    $("#keyTest").innerHTML = warn ? "⚠ 저장했지만 형식이 이상한 키가 있어요 (위 안내 참고)" : "✅ 저장했어요. 이제 '연결 테스트'로 확인해 보세요.";
+  } catch(err){ $("#keyTest").textContent = "❌ " + err.message; }
+};
+$("#btnTestKeys").onclick = async () => {
+  $("#keyTest").textContent = "확인하는 중…";
+  try{
+    await saveTypedKeys();                                // 칸에 입력만 하고 저장을 안 눌렀어도 먼저 저장
+    const r = await api("/api/keytest", {});
+    $("#keyTest").innerHTML = r.results.map(x => `${x.ok ? "✅" : "❌"} ${esc(x.name)}: ${esc(x.msg)}`).join("<br>")
+      || "등록된 키가 없어요. 위 칸에 키를 붙여 넣고 다시 눌러 주세요.";
+  } catch(err){ $("#keyTest").textContent = "❌ " + err.message; }
+};
+
+// ───────── 주기적으로 새로 고침
+selected = store("sel");
+refresh();
+(function loop(){
+  const busy = state.jobs.some(j => j.status === "running" || j.status === "queued");
+  setTimeout(async () => { await refresh(); await pollLog(); loop(); }, busy ? 1500 : 5000);
+})();
+</script>
+</body>
+</html>
