@@ -44,6 +44,7 @@ VIDEO_EXT = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".webm"}
 SCAN_DIRS = [BASE, BASE / "업로드", BASE / "쇼츠"]
 KEY_NAMES = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"]
 IS_WIN = platform.system() == "Windows"
+SERVER_ID = str(time.time())          # 서버가 다시 켜지면 바뀜 → 화면이 알아서 새로 고침
 
 
 # ─────────────────────────────────────────────────────────────
@@ -462,7 +463,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"videos": list_videos(),
                                 "jobs": [j.brief() for j in sorted(JOBS.values(), key=lambda j: -j.id)][:30],
                                 "keys": key_status(), "deps": deps_status(),
-                                "base": str(BASE)})
+                                "base": str(BASE),
+                                "ui_version": HTML_FILE.stat().st_mtime, "server_id": SERVER_ID})
             elif re.fullmatch(r"/api/jobs/\d+", u.path):
                 job = JOBS.get(int(u.path.rsplit("/", 1)[1]))
                 if not job:
@@ -619,33 +621,104 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"path": rel(dest), "name": dest.name})
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description="영상 자동화 로컬 웹앱")
-    ap.add_argument("--port", type=int, default=8765)
-    ap.add_argument("--no-browser", action="store_true")
-    args = ap.parse_args()
+def serve(args) -> None:
+    """실제 웹 서버."""
     if not HTML_FILE.exists():
         sys.exit(f"[오류] {HTML_FILE.name} 이 app.py 와 같은 폴더에 있어야 합니다.")
     UPLOAD_DIR.mkdir(exist_ok=True)
     threading.Thread(target=worker, daemon=True).start()
+    ThreadingHTTPServer.allow_reuse_address = True
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     except OSError:
         sys.exit(f"[오류] {args.port}번 포트를 쓸 수 없습니다. 이미 웹앱이 켜져 있거나 다른 프로그램이 쓰고 있어요.\n"
                  f"       브라우저에서 http://127.0.0.1:{args.port} 을 열어 보거나 --port 9000 으로 실행하세요.")
     url = f"http://127.0.0.1:{args.port}"
-    print(f"▶ 영상 자동화 웹앱이 켜졌습니다: {url}")
-    print(f"  API 키 저장 위치: {SETTINGS_FILE}")
-    print("  이 창을 닫으면 웹앱도 꺼집니다. (끝내려면 Ctrl+C)")
+    print(f"▶ 영상 자동화 웹앱이 켜졌습니다: {url}", flush=True)
+    print(f"  API 키 저장 위치: {SETTINGS_FILE}", flush=True)
     if not args.no_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        print("\n웹앱을 끕니다.")
+        pass
+    finally:
         for j in JOBS.values():
             if j.proc:
                 kill_tree(j.proc)
+
+
+# ─────────────────────────────────────────────────────────────
+# 자동 다시 켜기: app.py 가 바뀌면 서버를 새로 띄움
+#   - webapp.html 이 바뀌면 → 서버는 그대로, 브라우저 화면만 알아서 새로 고침
+#   - auto_editor.py / auto_shorts.py 가 바뀌면 → 다음 작업부터 바로 새 코드로 실행
+#   - app.py 가 바뀌면 → 진행 중인 작업이 끝나길 기다렸다가 서버를 다시 켬
+# ─────────────────────────────────────────────────────────────
+def server_busy(port: int) -> bool:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/state", timeout=5) as r:
+            jobs = json.loads(r.read()).get("jobs", [])
+        return any(j["status"] in ("running", "queued") for j in jobs)
+    except Exception:
+        return False
+
+
+def supervise(args) -> None:
+    me = Path(__file__).resolve()
+    cmd = [sys.executable, str(me), "--serve", "--no-browser", "--port", str(args.port)]
+    url = f"http://127.0.0.1:{args.port}"
+    print("  이 창을 닫으면 웹앱도 꺼집니다. (끝내려면 Ctrl+C)")
+    print("  프로그램 파일이 바뀌면 자동으로 다시 적용됩니다.\n")
+    first, child = True, None
+    try:
+        while True:
+            stamp = me.stat().st_mtime
+            child = subprocess.Popen(cmd, cwd=BASE, env=child_env())
+            if first and not args.no_browser:
+                threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+            first = False
+            waiting_msg = False
+            while True:
+                time.sleep(1.5)
+                try:
+                    changed = me.stat().st_mtime != stamp
+                except OSError:          # 저장하는 도중이면 잠깐 없을 수 있음
+                    continue
+                if child.poll() is not None and not changed:
+                    print("[오류] 웹앱이 멈췄습니다. app.py 를 고치면 자동으로 다시 켭니다.", flush=True)
+                    while me.stat().st_mtime == stamp:
+                        time.sleep(1.5)
+                    changed = True
+                if changed:
+                    if child.poll() is None and server_busy(args.port):
+                        if not waiting_msg:
+                            print("▷ app.py 가 바뀌었습니다. 진행 중인 작업이 끝나면 다시 켭니다…", flush=True)
+                            waiting_msg = True
+                        continue
+                    print("\n↻ app.py 가 바뀌어 웹앱을 다시 켭니다…", flush=True)
+                    time.sleep(0.5)      # 파일 저장이 끝나길 잠깐 기다림
+                    if child.poll() is None:
+                        kill_tree(child)
+                        child.wait()
+                    break
+    except KeyboardInterrupt:
+        print("\n웹앱을 끕니다.")
+    finally:
+        if child and child.poll() is None:
+            kill_tree(child)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="영상 자동화 로컬 웹앱")
+    ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--no-reload", action="store_true", help="파일이 바뀌어도 자동으로 다시 켜지 않기")
+    ap.add_argument("--serve", action="store_true", help=argparse.SUPPRESS)   # 내부용
+    args = ap.parse_args()
+    if args.serve or args.no_reload:
+        serve(args)
+    else:
+        supervise(args)
 
 
 if __name__ == "__main__":

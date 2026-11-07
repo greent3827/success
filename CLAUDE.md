@@ -29,6 +29,8 @@ python auto_editor.py 영상.mp4
 python auto_shorts.py 영상.mp4 --count 3 --layout auto
 ```
 
+`python app.py`는 감시 프로세스로 뜨고 실제 서버(`--serve`)를 자식으로 실행합니다. `app.py`가 바뀌면 진행 중인 작업이 끝난 뒤 서버를 다시 켜고, `webapp.html`이 바뀌면 브라우저가 스스로 새로 고칩니다(`/api/state`의 `ui_version`, `server_id`). `auto_*.py`는 작업마다 새로 실행되므로 바로 반영됩니다. 끄려면 `--no-reload`.
+
 필요한 것: Python 3.10+, ffmpeg/ffprobe(PATH), `pip install -r requirements.txt`.
 
 ## 결과물과 재실행 규칙

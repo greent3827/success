@@ -96,7 +96,7 @@ a.btn{text-decoration:none;display:inline-block;color:inherit}
 .st.queued{background:var(--panel2);color:var(--muted)} .st.running{background:var(--run-soft);color:var(--run)}
 .st.done{background:var(--ok-soft);color:var(--ok)} .st.failed,.st.canceled{background:var(--warn-soft);color:var(--warn)}
 .jl{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
-#log{margin:0;padding:10px 12px;height:340px;overflow:auto;background:#0f1115;color:#d6dae0;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;border-radius:0 0 12px 12px}
+#log{margin:0;padding:10px 12px;height:340px;overflow:auto;background:#2a2410;color:#f3e7c4;font:12px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;border-radius:0 0 12px 12px}
 #log .err{color:#ff8a8a} #log .ok{color:#6ee7a8} #log .step{color:#93c5fd;font-weight:700}
 dialog{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--panel);color:var(--text);width:min(520px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(0,0,0,.4)}
@@ -208,8 +208,15 @@ function setOffline(v){
 }
 
 // ───────── 상태 불러오기
+let seenUi = null, seenServer = null;
 async function refresh(){
   try { state = await api("/api/state"); } catch(e){ return; }
+  // 화면 파일이 바뀌었거나 서버가 새로 켜졌으면 알아서 새로 고침 (입력 중이면 기다림)
+  if (seenUi === null){ seenUi = state.ui_version; seenServer = state.server_id; }
+  else if (state.ui_version !== seenUi || state.server_id !== seenServer){
+    const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || "") || $("#dlgKeys").open;
+    if (!typing){ toast("새 버전을 적용합니다…"); setTimeout(() => location.reload(), 600); return; }
+  }
   renderChips(); renderBanner(); renderVideos(); renderJobs(); renderDetail();
 }
 function renderChips(){
