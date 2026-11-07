@@ -6,22 +6,26 @@
 <title>영상 자동화 스튜디오</title>
 <style>
 :root{
-  --bg:#f5f6f8; --panel:#ffffff; --panel2:#f0f2f5; --line:#e2e5ea; --text:#1b1f24; --muted:#667085;
-  --accent:#e5484d; --accent-ink:#fff; --accent-soft:#fdecec; --ok:#1a7f4b; --ok-soft:#e5f5ec;
-  --warn:#9a6700; --warn-soft:#fff6db; --run:#2563eb; --run-soft:#e8efff; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  /* 노란색 테마 */
+  --bg:#fffbea; --panel:#ffffff; --panel2:#fff6d6; --line:#f1e4b3; --text:#2b2410; --muted:#7a6a3a;
+  --accent:#ffc928; --accent-ink:#2b2410; --accent-soft:#fff1bf; --accent-text:#8a6100;
+  --ok:#2f7d32; --ok-soft:#e6f4e4;
+  --warn:#c2410c; --warn-soft:#ffedd5; --run:#b07800; --run-soft:#fff3c4;
+  --head:linear-gradient(90deg,#ffd84d,#ffc107); --shadow:0 1px 2px rgba(120,90,0,.08),0 2px 6px rgba(120,90,0,.08);
   --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 @media (prefers-color-scheme: dark){
-  :root{--bg:#121417; --panel:#1a1d21; --panel2:#22262b; --line:#2e333a; --text:#e8eaed; --muted:#9aa3ae;
-  --accent:#ff6369; --accent-ink:#1a0b0b; --accent-soft:#3a1d1f; --ok:#4cc38a; --ok-soft:#173226;
-  --warn:#f0c14b; --warn-soft:#3a3016; --run:#7aa2ff; --run-soft:#1b2540; --shadow:none}
+  :root{--bg:#17140a; --panel:#211c0e; --panel2:#2c2512; --line:#3d3418; --text:#f5ecd0; --muted:#bfae7a;
+  --accent:#ffcc33; --accent-ink:#1f1800; --accent-soft:#3a3012; --accent-text:#ffd75e;
+  --ok:#6fcf73; --ok-soft:#1c2e18; --warn:#ff9a5c; --warn-soft:#3a2416; --run:#ffd75e; --run-soft:#3a3012;
+  --head:linear-gradient(90deg,#3a2f0c,#2c2410); --shadow:none}
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif}
 button,input,select,textarea{font:inherit;color:inherit}
-header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--head);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 header h1{font-size:17px;margin:0;font-weight:700;display:flex;align-items:center;gap:8px}
-header h1 .dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+header h1 .dot{width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px rgba(0,0,0,.12)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .chip{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--panel2);color:var(--muted);white-space:nowrap}
 .chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.bad{background:var(--warn-soft);color:var(--warn)}
@@ -41,14 +45,14 @@ main{display:grid;grid-template-columns:300px minmax(0,1fr) 360px;gap:16px;paddi
 .banner{margin:16px 20px 0;padding:12px 14px;border-radius:10px;background:var(--warn-soft);color:var(--warn);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .banner b{color:inherit}
 #drop{margin:12px;border:1.5px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s}
-#drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+#drop.over{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-text)}
 #drop .big{font-weight:600;color:var(--text)}
 .prog{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:8px;display:none}
 .prog i{display:block;height:100%;background:var(--accent);width:0}
 #videoList{list-style:none;margin:0;padding:0 6px 8px;max-height:calc(100vh - 290px);overflow:auto}
 #videoList li{padding:10px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:4px}
 #videoList li:hover{background:var(--panel2)}
-#videoList li.sel{background:var(--accent-soft)}
+#videoList li.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
 .vname{font-weight:600;word-break:break-all}
 .meta{font-size:12px;color:var(--muted)}
 .badges{display:flex;gap:4px;flex-wrap:wrap}
@@ -200,7 +204,7 @@ async function api(path, body){
 function setOffline(v){
   if (offline === v) return;
   offline = v;
-  $("#offline").innerHTML = v ? `<div class="banner" style="background:var(--accent-soft);color:var(--accent)"><b>연결 안 됨</b> ${esc(OFFLINE_MSG)}</div>` : "";
+  $("#offline").innerHTML = v ? `<div class="banner" style="background:var(--warn-soft);color:var(--warn)"><b>연결 안 됨</b> ${esc(OFFLINE_MSG)}</div>` : "";
 }
 
 // ───────── 상태 불러오기
